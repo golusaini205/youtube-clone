@@ -23,150 +23,211 @@ const SECRET = "mysecretkey";
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, "youtube_clone.db");
 const db = new sqlite3.Database(DB_PATH);
 
-// Initialize database tables
-db.serialize(() => {
-  db.run(`CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    password TEXT NOT NULL
-  )`);
+// Initialize database with proper error handling
+let dbReady = false;
 
-  db.run(`CREATE TABLE IF NOT EXISTS videos (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    filename TEXT NOT NULL,
-    category TEXT,
-    thumbnail TEXT,
-    likes INTEGER DEFAULT 0,
-    videoUrl TEXT,
-    is_default INTEGER DEFAULT 0,
-    description TEXT
-  )`);
+function initializeDatabase() {
+  return new Promise((resolve, reject) => {
+    db.serialize(() => {
+      // Create users table
+      db.run(`CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL
+      )`, (err) => {
+        if (err) console.error("Error creating users table:", err);
+      });
 
-  db.run(`CREATE TABLE IF NOT EXISTS comments (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
-    video_id INTEGER,
-    comment TEXT,
-    FOREIGN KEY(user_id) REFERENCES users(id),
-    FOREIGN KEY(video_id) REFERENCES videos(id)
-  )`, () => {
-    // After tables are created, seed default videos and remove duplicates
-    seedDefaultVideos();
-    setTimeout(() => removeDuplicateVideos(), 2000);
+      // Create videos table
+      db.run(`CREATE TABLE IF NOT EXISTS videos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        filename TEXT NOT NULL,
+        category TEXT,
+        thumbnail TEXT,
+        likes INTEGER DEFAULT 0,
+        videoUrl TEXT,
+        is_default INTEGER DEFAULT 0,
+        description TEXT
+      )`, (err) => {
+        if (err) console.error("Error creating videos table:", err);
+      });
+
+      // Create comments table
+      db.run(`CREATE TABLE IF NOT EXISTS comments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        video_id INTEGER,
+        comment TEXT,
+        FOREIGN KEY(user_id) REFERENCES users(id),
+        FOREIGN KEY(video_id) REFERENCES videos(id)
+      )`, (err) => {
+        if (err) console.error("Error creating comments table:", err);
+      });
+
+      // After tables are created, seed default videos
+      setTimeout(() => {
+        seedDefaultVideos().then(() => {
+          dbReady = true;
+          console.log("✅ Database initialized successfully");
+          resolve();
+        }).catch(err => {
+          console.error("Error during initialization:", err);
+          reject(err);
+        });
+      }, 500);
+    });
   });
+}
+
+// Initialize database on startup
+initializeDatabase().catch(err => {
+  console.error("Failed to initialize database:", err);
+  process.exit(1);
 });
 
 // Seed default YouTube videos
 function seedDefaultVideos() {
-  const defaultVideos = [
-    { videoId: 'KzXnXhekOz4', title: 'Amazing Music Video 1', description: 'An incredible music video with amazing visuals and great beats.' },
-    { videoId: 'w9WgzE5WiyU', title: 'Great Content 2', description: 'High quality content that will keep you entertained.' },
-    { videoId: 'iYqqP1qcv5c', title: 'Interesting Video 3', description: 'Discover something new and interesting in this video.' },
-    { videoId: '5ukPCvdY0YY', title: 'Popular Video 4', description: 'One of the most popular videos with millions of views.' },
-    { videoId: '0TMi1bnsUZo', title: 'Trending Video 5', description: 'Currently trending - check out what everyone is watching.' },
-    { videoId: 'ZqwttIdH840', title: 'Top Video 6', description: 'Top rated content from creators you love.' },
-    { videoId: 'xVGCFuIiIG0', title: 'Best Video 7', description: 'The best videos handpicked for your enjoyment.' },
-    { videoId: 'aEw7d3EPnMU', title: 'Awesome Content 8', description: 'Awesome and engaging content that stands out.' },
-    { videoId: 'SpMsTsnYOss', title: 'Live Stream Video 9', description: 'Live streaming experience with real-time engagement.' },
-    { videoId: 'lZmvMW1ugRM', title: 'Featured Video 10', description: 'Featured content from the best creators.' },
-    { videoId: 'oK9oTZR-ee4', title: 'Recommended Video 11', description: 'Recommended just for you based on your preferences.' },
-    { videoId: '8CCh_GLviFc', title: 'Amazing Video 12', description: 'Discover amazing content you will love watching.' },
-    { videoId: 'ZjxiNW-6aPU', title: 'Great Short Video 13', description: 'Quick and entertaining short form content.' },
-    { videoId: 'dcPOFGOC58o', title: 'Interesting Video 14', description: 'Fascinating content that keeps you engaged.' },
-    { videoId: 'to9DjfD-mm0', title: 'Popular Video 15', description: 'Popular video with thousands of views and engagement.' },
-    { videoId: 'kiiP56E_cCQ', title: 'Trending Video 16', description: 'Latest trending content everyone is watching.' },
-    { videoId: 'G9MPvy7RlS4', title: 'Featured Video 17', description: 'Specially featured content just for you.' },
-    { videoId: 'scu6_n8ozqE', title: 'Best Video 18', description: 'Best of the best videos curated for quality.' },
-    { videoId: 'r1ZM2vXiVvs', title: 'Top Video 19', description: 'Top rated and most viewed video of the month.' },
-    { videoId: '_cESW8BwGoU', title: 'Awesome Video 20', description: 'Awesome content that stands out from the rest.' },
-    { videoId: '4RW-vaVbS_0', title: 'Trending Video 21', description: 'Currently trending in the community worldwide.' },
-    { videoId: 'RzH5P-f4abg', title: 'Recommended Video 22', description: 'Recommended based on your viewing preferences.' },
-    { videoId: 'Ebe9NFgQnnU', title: 'Great Video 23', description: 'Great quality video with excellent production value.' },
-    { videoId: 'EZ2ZJxZhBoA', title: 'Popular Video 24', description: 'Popular across all platforms with great engagement.' },
-    { videoId: 'i40mxe8lUg0', title: 'Featured Video 25', description: 'Featured on homepage due to excellent quality.' },
-    { videoId: 'jjpjjcMeujM', title: 'Best Video 26', description: 'Best of our collection that you should watch.' },
-    { videoId: 'Z4hVGCWH1Kc', title: 'Trending Video 27', description: 'Trending now and gaining views every minute.' }
-  ];
+  return new Promise((resolve) => {
+    const defaultVideos = [
+      { videoId: 'KzXnXhekOz4', title: 'Amazing Music Video 1', description: 'An incredible music video with amazing visuals and great beats.' },
+      { videoId: 'w9WgzE5WiyU', title: 'Great Content 2', description: 'High quality content that will keep you entertained.' },
+      { videoId: 'iYqqP1qcv5c', title: 'Interesting Video 3', description: 'Discover something new and interesting in this video.' },
+      { videoId: '5ukPCvdY0YY', title: 'Popular Video 4', description: 'One of the most popular videos with millions of views.' },
+      { videoId: '0TMi1bnsUZo', title: 'Trending Video 5', description: 'Currently trending - check out what everyone is watching.' },
+      { videoId: 'ZqwttIdH840', title: 'Top Video 6', description: 'Top rated content from creators you love.' },
+      { videoId: 'xVGCFuIiIG0', title: 'Best Video 7', description: 'The best videos handpicked for your enjoyment.' },
+      { videoId: 'aEw7d3EPnMU', title: 'Awesome Content 8', description: 'Awesome and engaging content that stands out.' },
+      { videoId: 'SpMsTsnYOss', title: 'Live Stream Video 9', description: 'Live streaming experience with real-time engagement.' },
+      { videoId: 'lZmvMW1ugRM', title: 'Featured Video 10', description: 'Featured content from the best creators.' },
+      { videoId: 'oK9oTZR-ee4', title: 'Recommended Video 11', description: 'Recommended just for you based on your preferences.' },
+      { videoId: '8CCh_GLviFc', title: 'Amazing Video 12', description: 'Discover amazing content you will love watching.' },
+      { videoId: 'ZjxiNW-6aPU', title: 'Great Short Video 13', description: 'Quick and entertaining short form content.' },
+      { videoId: 'dcPOFGOC58o', title: 'Interesting Video 14', description: 'Fascinating content that keeps you engaged.' },
+      { videoId: 'to9DjfD-mm0', title: 'Popular Video 15', description: 'Popular video with thousands of views and engagement.' },
+      { videoId: 'kiiP56E_cCQ', title: 'Trending Video 16', description: 'Latest trending content everyone is watching.' },
+      { videoId: 'G9MPvy7RlS4', title: 'Featured Video 17', description: 'Specially featured content just for you.' },
+      { videoId: 'scu6_n8ozqE', title: 'Best Video 18', description: 'Best of the best videos curated for quality.' },
+      { videoId: 'r1ZM2vXiVvs', title: 'Top Video 19', description: 'Top rated and most viewed video of the month.' },
+      { videoId: '_cESW8BwGoU', title: 'Awesome Video 20', description: 'Awesome content that stands out from the rest.' },
+      { videoId: '4RW-vaVbS_0', title: 'Trending Video 21', description: 'Currently trending in the community worldwide.' },
+      { videoId: 'RzH5P-f4abg', title: 'Recommended Video 22', description: 'Recommended based on your viewing preferences.' },
+      { videoId: 'Ebe9NFgQnnU', title: 'Great Video 23', description: 'Great quality video with excellent production value.' },
+      { videoId: 'EZ2ZJxZhBoA', title: 'Popular Video 24', description: 'Popular across all platforms with great engagement.' },
+      { videoId: 'i40mxe8lUg0', title: 'Featured Video 25', description: 'Featured on homepage due to excellent quality.' },
+      { videoId: 'jjpjjcMeujM', title: 'Best Video 26', description: 'Best of our collection that you should watch.' },
+      { videoId: 'Z4hVGCWH1Kc', title: 'Trending Video 27', description: 'Trending now and gaining views every minute.' }
+    ];
 
-  // Check if videos already exist
-  db.get("SELECT COUNT(*) as count FROM videos", (err, result) => {
-    if (err) {
-      console.error("Error checking videos:", err);
-      return;
-    }
+    // Check if videos already exist
+    db.get("SELECT COUNT(*) as count FROM videos", (err, result) => {
+      if (err) {
+        console.error("Error checking videos:", err);
+        resolve();
+        return;
+      }
 
-    // Only seed if table is empty
-    if (result.count === 0) {
-      defaultVideos.forEach(video => {
-        const thumbnail = `https://img.youtube.com/vi/${video.videoId}/maxresdefault.jpg`;
-        const embedUrl = `https://www.youtube.com/embed/${video.videoId}`;
+      // Only seed if table is empty
+      if (result && result.count === 0) {
+        let insertedCount = 0;
+        
+        defaultVideos.forEach((video, index) => {
+          const thumbnail = `https://img.youtube.com/vi/${video.videoId}/maxresdefault.jpg`;
+          const embedUrl = `https://www.youtube.com/embed/${video.videoId}`;
 
-        db.run(
-          "INSERT INTO videos (title, filename, category, thumbnail, videoUrl, likes, is_default, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-          [video.title, video.videoId, 'Trending', thumbnail, embedUrl, Math.floor(Math.random() * 1000), 1, video.description],
-          (err) => {
-            if (err) {
-              console.error(`Error inserting video ${video.videoId}:`, err);
-            } else {
-              console.log(`✅ Default video added: ${video.title}`);
+          db.run(
+            "INSERT INTO videos (title, filename, category, thumbnail, videoUrl, likes, is_default, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            [video.title, video.videoId, 'Trending', thumbnail, embedUrl, Math.floor(Math.random() * 1000), 1, video.description],
+            (err) => {
+              if (err) {
+                console.error(`Error inserting video ${video.videoId}:`, err);
+              } else {
+                insertedCount++;
+                console.log(`✅ Default video added: ${video.title} (${insertedCount}/${defaultVideos.length})`);
+              }
+              
+              // Resolve when all videos are processed
+              if (insertedCount === defaultVideos.length) {
+                console.log(`✅ All ${defaultVideos.length} default videos seeded successfully`);
+                removeDuplicateVideos().then(resolve).catch(resolve);
+              }
             }
-          }
-        );
-      });
-    }
+          );
+        });
+      } else {
+        console.log(`✅ Videos already exist (${result?.count || 0} videos found). Skipping seeding.`);
+        resolve();
+      }
+    });
   });
 }
 
 // Remove duplicate videos - keep the first occurrence, delete duplicates
 function removeDuplicateVideos() {
-  db.all(
-    `SELECT filename, COUNT(*) as count, GROUP_CONCAT(id) as ids 
-     FROM videos 
-     GROUP BY filename 
-     HAVING count > 1`,
-    (err, duplicates) => {
-      if (err) {
-        console.error("Error finding duplicates:", err);
-        return;
-      }
+  return new Promise((resolve) => {
+    db.all(
+      `SELECT filename, COUNT(*) as count, GROUP_CONCAT(id) as ids 
+       FROM videos 
+       GROUP BY filename 
+       HAVING count > 1`,
+      (err, duplicates) => {
+        if (err) {
+          console.error("Error finding duplicates:", err);
+          resolve();
+          return;
+        }
 
-      if (!duplicates || duplicates.length === 0) {
-        console.log("✅ No duplicate videos found");
-        return;
-      }
+        if (!duplicates || duplicates.length === 0) {
+          console.log("✅ No duplicate videos found");
+          resolve();
+          return;
+        }
 
-      duplicates.forEach(dup => {
-        const ids = dup.ids.split(',');
-        // Keep the first ID, delete the rest
-        const idsToDelete = ids.slice(1);
-        
-        idsToDelete.forEach(id => {
-          db.run(
-            "DELETE FROM videos WHERE id = ?",
-            [id],
-            (err) => {
-              if (err) {
-                console.error(`Error deleting duplicate video ${id}:`, err);
-              } else {
-                console.log(`🗑️ Removed duplicate video ID: ${id}`);
+        let deletedCount = 0;
+        const totalDuplicates = duplicates.reduce((sum, dup) => sum + (dup.ids.split(',').length - 1), 0);
+
+        duplicates.forEach(dup => {
+          const ids = dup.ids.split(',');
+          // Keep the first ID, delete the rest
+          const idsToDelete = ids.slice(1);
+          
+          idsToDelete.forEach(id => {
+            db.run(
+              "DELETE FROM videos WHERE id = ?",
+              [id],
+              (err) => {
+                if (err) {
+                  console.error(`Error deleting duplicate video ${id}:`, err);
+                } else {
+                  deletedCount++;
+                  console.log(`🗑️ Removed duplicate video ID: ${id} (${deletedCount}/${totalDuplicates})`);
+                }
+
+                // Also delete associated comments
+                db.run(
+                  "DELETE FROM comments WHERE video_id = ?",
+                  [id],
+                  (err) => {
+                    if (err) console.error(`Error deleting comments for video ${id}:`, err);
+                    
+                    if (deletedCount === totalDuplicates) {
+                      console.log(`✅ Removed ${deletedCount} duplicate videos`);
+                      resolve();
+                    }
+                  }
+                );
               }
-            }
-          );
-
-          // Also delete associated comments
-          db.run(
-            "DELETE FROM comments WHERE video_id = ?",
-            [id],
-            (err) => {
-              if (err) console.error(`Error deleting comments for video ${id}:`, err);
-            }
-          );
+            );
+          });
         });
-      });
-    }
-  );
+
+        if (totalDuplicates === 0) {
+          resolve();
+        }
+      }
+    );
+  });
 }
 
 // Function to fetch YouTube video description from initial data
@@ -508,4 +569,9 @@ app.delete("/videos", (req, res) => {
   }
 });
 
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// Start server only after database is ready
+app.listen(PORT, () => {
+  console.log(`✅ Server running on port ${PORT}`);
+  console.log(`🔗 API URL: http://localhost:${PORT}`);
+  console.log(`📺 Videos endpoint: http://localhost:${PORT}/videos`);
+});
