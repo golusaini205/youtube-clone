@@ -158,13 +158,6 @@ See `.env.example` for all available options.
 - jsonwebtoken (JWT auth)
 - Multer (file uploads)
 
-## 📄 License
-
-MIT
-
-## 👨‍💻 Contributing
-
-Feel free to fork and submit pull requests!
 
 ## 🤝 Support
 
