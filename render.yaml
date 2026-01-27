@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: youtube-clone-backend
+    runtime: node
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && npm start
+    env:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+    routes:
+      - path: /api
+        destination: http://localhost:5000
+
+  - type: static
+    name: youtube-clone-frontend
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: frontend/dist
+    routes:
+      - path: /
+        destination: index.html
