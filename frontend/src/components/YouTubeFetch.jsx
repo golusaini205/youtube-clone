@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import axios from 'axios';
+import { apiUrl } from '../api';
 
 export default function YouTubeFetch() {
   const [youtubeUrl, setYoutubeUrl] = useState('');
@@ -94,7 +95,7 @@ export default function YouTubeFetch() {
         return;
       }
 
-      const response = await axios.post('/api/import-youtube', {
+      const response = await axios.post(apiUrl('/import-youtube'), {
         url: videoData.embedUrl,
         title: videoData.title,
         category: 'YouTube',

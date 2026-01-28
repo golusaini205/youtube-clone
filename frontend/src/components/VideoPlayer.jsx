@@ -1,5 +1,6 @@
 
 import { useState } from 'react';
+import { API_BASE } from '../api';
 
 export default function VideoPlayer({ video, onClose }) {
   if (!video) return null;
@@ -31,7 +32,7 @@ export default function VideoPlayer({ video, onClose }) {
               autoPlay
               style={{ borderRadius: '8px', backgroundColor: '#000' }}
             >
-              <source src={`/api/uploads/${video.filename}`} type="video/mp4" />
+              <source src={`${API_BASE}/uploads/${video.filename}`} type="video/mp4" />
               Your browser does not support the video tag.
             </video>
           )}

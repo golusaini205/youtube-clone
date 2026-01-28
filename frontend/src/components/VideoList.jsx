@@ -2,6 +2,7 @@
 import {useEffect, useState} from 'react';
 import axios from 'axios';
 import VideoPlayer from './VideoPlayer';
+import { apiUrl } from '../api';
 
 export default function VideoList({ searchQuery = '' }){
  const [videos, setVideos] = useState([]);
@@ -10,8 +11,8 @@ export default function VideoList({ searchQuery = '' }){
 
  const load = (q) => {
   setLoading(true);
-  let url = '/api/videos';
-  if(q) url += '?q=' + q;
+  let url = apiUrl('/videos');
+  if(q) url += '?q=' + encodeURIComponent(q);
   console.log('Fetching videos from:', url);
   axios.get(url)
    .then(r => {
@@ -30,7 +31,7 @@ export default function VideoList({ searchQuery = '' }){
   if(!confirmed) return;
   
   try {
-   await axios.delete('/api/videos/' + id);
+   await axios.delete(apiUrl('/videos/' + id));
    load();
   } catch(err) {
    console.error('Error deleting video:', err);

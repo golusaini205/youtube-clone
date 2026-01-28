@@ -1,6 +1,7 @@
 
 import {useState} from 'react';
 import axios from 'axios';
+import { apiUrl } from '../api';
 
 export default function YoutubeImport(){
   const [url, setUrl] = useState('');
@@ -46,7 +47,7 @@ export default function YoutubeImport(){
     setLoading(true);
     setMessage('');
     try {
-      const res = await axios.post('/api/import-youtube', { url, title, category });
+      const res = await axios.post(apiUrl('/import-youtube'), { url, title, category });
       setMessage('✓ Video imported successfully!');
       setUrl('');
       setTitle('');

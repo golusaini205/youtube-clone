@@ -1,6 +1,7 @@
 
 import {useState} from 'react';
 import axios from 'axios';
+import { apiUrl } from '../api';
 
 export default function Upload(){
  const [title, setTitle] = useState('');
@@ -24,7 +25,7 @@ export default function Upload(){
    fd.append('category', category);
    fd.append('video', video);
    fd.append('thumbnail', thumbnail);
-   await axios.post('/api/upload', fd);
+   await axios.post(apiUrl('/upload'), fd);
    setMessage('✓ Video uploaded successfully!');
    setTitle('');
    setCategory('');
