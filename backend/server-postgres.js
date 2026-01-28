@@ -22,8 +22,21 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 const SECRET = process.env.JWT_SECRET || "mysecretkey";
 
 // PostgreSQL connection pool
+// Support both DATABASE_URL and individual environment variables
+const connectionString = process.env.DATABASE_URL || 
+  (process.env.DB_HOST && process.env.DB_USER && process.env.DB_PASSWORD && process.env.DB_NAME
+    ? `postgresql://${process.env.DB_USER}:${process.env.DB_PASSWORD}@${process.env.DB_HOST}:${process.env.DB_PORT || 5432}/${process.env.DB_NAME}`
+    : null);
+
+if (!connectionString) {
+  console.error("❌ Error: DATABASE_URL or individual DB environment variables (DB_HOST, DB_USER, DB_PASSWORD, DB_NAME) are required");
+  process.exit(1);
+}
+
+console.log(`📡 Connecting to PostgreSQL at ${connectionString.split('@')[1] || 'localhost'}...`);
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: connectionString,
   ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
 });
 
