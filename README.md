@@ -2,7 +2,7 @@
 
 A modern YouTube clone built with React and Express, featuring video streaming, search, and a beautiful responsive UI.
 
-## ✨ Features
+##  Features
 
 - **Video Management**: Upload, import YouTube videos, delete videos
 - **Video Playback**: Stream YouTube embeds and local video files
@@ -45,7 +45,7 @@ A modern YouTube clone built with React and Express, featuring video streaming, 
 npm run dev
 ```
 
-## 📦 Build for Production
+##  Build for Production
 
 ```bash
 npm run build
@@ -53,7 +53,7 @@ npm run build
 
 This creates an optimized build in `frontend/dist`
 
-## 🌐 Deploy to Render
+##  Deploy to Render
 
 
 ### Deployment Steps
@@ -93,7 +93,7 @@ This creates an optimized build in `frontend/dist`
    - Update frontend `vite.config.js` to use your backend URL
    - Set API proxy to your Render backend URL
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 youtube-clone/
@@ -116,7 +116,7 @@ youtube-clone/
 └── README.md               # This file
 ```
 
-## 🔧 Configuration
+## Configuration
 
 ### Environment Variables
 
@@ -131,7 +131,7 @@ JWT_SECRET=your-secret-key-here
 
 See `.env.example` for all available options.
 
-## 📝 API Endpoints
+##  API Endpoints
 
 ### Videos
 - `GET /videos` - Get all videos (with optional search query)
@@ -142,7 +142,7 @@ See `.env.example` for all available options.
 - `POST /register` - Register new user
 - `POST /login` - Login user
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 **Frontend**
 - React 18.2.0
@@ -158,13 +158,6 @@ See `.env.example` for all available options.
 - jsonwebtoken (JWT auth)
 - Multer (file uploads)
 
-## 📄 License
-
-MIT
-
-## 👨‍💻 Contributing
-
-Feel free to fork and submit pull requests!
 
 ## 🤝 Support
 
