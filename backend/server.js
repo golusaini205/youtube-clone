@@ -1,16 +1,19 @@
-
 import express from "express";
 import cors from "cors";
 import multer from "multer";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import sqlite3 from "sqlite3";
+import mongoose from "mongoose";
+import dotenv from "dotenv";
 import https from "https";
 import path from "path";
+import fs from "fs/promises";
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -19,253 +22,146 @@ app.use(cors());
 app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-const SECRET = "mysecretkey";
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, "youtube_clone.db");
-const db = new sqlite3.Database(DB_PATH);
+const SECRET = process.env.JWT_SECRET || "3f8df97f7c75d7d478e34b364dc7d37b";
+
+const MONGODB_URI = process.env.MONGODB_URI || process.env.MONGO_URI;
+if (!MONGODB_URI) {
+  console.error("ERROR: MONGODB_URI (or MONGO_URI) is required");
+  process.exit(1);
+}
+
+mongoose.set("strictQuery", true);
+
+const userSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true },
+    email: { type: String, required: true, unique: true },
+    password: { type: String, required: true }
+  },
+  { timestamps: true }
+);
+
+const videoSchema = new mongoose.Schema(
+  {
+    title: { type: String, required: true },
+    filename: { type: String, required: true, unique: true },
+    category: { type: String, default: "" },
+    thumbnail: { type: String, default: "" },
+    likes: { type: Number, default: 0 },
+    videoUrl: { type: String, default: null },
+    is_default: { type: Boolean, default: false },
+    description: { type: String, default: "" }
+  },
+  { timestamps: true }
+);
+
+const commentSchema = new mongoose.Schema(
+  {
+    user_id: { type: String, default: "" },
+    video_id: { type: String, required: true },
+    comment: { type: String, required: true }
+  },
+  { timestamps: true }
+);
+
+videoSchema.set("toJSON", {
+  transform: (_doc, ret) => {
+    ret.id = ret._id.toString();
+    delete ret._id;
+    delete ret.__v;
+    return ret;
+  }
+});
+
+commentSchema.set("toJSON", {
+  transform: (_doc, ret) => {
+    ret.id = ret._id.toString();
+    delete ret._id;
+    delete ret.__v;
+    return ret;
+  }
+});
+
+const User = mongoose.model("User", userSchema);
+const Video = mongoose.model("Video", videoSchema);
+const Comment = mongoose.model("Comment", commentSchema);
+
+const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 // Initialize database with proper error handling
 let dbReady = false;
 
-function initializeDatabase() {
-  return new Promise((resolve, reject) => {
-    db.serialize(() => {
-      // Create users table
-      db.run(`CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL
-      )`, (err) => {
-        if (err) console.error("Error creating users table:", err);
-      });
-
-      // Create videos table
-      db.run(`CREATE TABLE IF NOT EXISTS videos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT NOT NULL,
-        filename TEXT NOT NULL,
-        category TEXT,
-        thumbnail TEXT,
-        likes INTEGER DEFAULT 0,
-        videoUrl TEXT,
-        is_default INTEGER DEFAULT 0,
-        description TEXT
-      )`, (err) => {
-        if (err) console.error("Error creating videos table:", err);
-      });
-
-      // Create comments table
-      db.run(`CREATE TABLE IF NOT EXISTS comments (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER,
-        video_id INTEGER,
-        comment TEXT,
-        FOREIGN KEY(user_id) REFERENCES users(id),
-        FOREIGN KEY(video_id) REFERENCES videos(id)
-      )`, (err) => {
-        if (err) console.error("Error creating comments table:", err);
-      });
-
-      // After tables are created, seed default videos
-      setTimeout(() => {
-        seedDefaultVideos().then(() => {
-          dbReady = true;
-          console.log("✅ Database initialized successfully");
-          resolve();
-        }).catch(err => {
-          console.error("Error during initialization:", err);
-          reject(err);
-        });
-      }, 500);
-    });
-  });
+async function initializeDatabase() {
+  try {
+    await mongoose.connect(MONGODB_URI);
+    await seedDefaultVideos();
+    dbReady = true;
+    console.log("OK: MongoDB connected and ready");
+  } catch (err) {
+    console.error("ERROR: Database initialization failed:", err);
+    throw err;
+  }
 }
-
-// Initialize database on startup
-initializeDatabase().catch(err => {
-  console.error("Failed to initialize database:", err);
-  process.exit(1);
-});
 
 // Seed default YouTube videos
-function seedDefaultVideos() {
-  return new Promise((resolve) => {
-    const defaultVideos = [
-      { videoId: 'KzXnXhekOz4', title: 'Amazing Music Video 1', description: 'An incredible music video with amazing visuals and great beats.' },
-      { videoId: 'w9WgzE5WiyU', title: 'Great Content 2', description: 'High quality content that will keep you entertained.' },
-      { videoId: 'iYqqP1qcv5c', title: 'Interesting Video 3', description: 'Discover something new and interesting in this video.' },
-      { videoId: '5ukPCvdY0YY', title: 'Popular Video 4', description: 'One of the most popular videos with millions of views.' },
-      { videoId: '0TMi1bnsUZo', title: 'Trending Video 5', description: 'Currently trending - check out what everyone is watching.' },
-      { videoId: 'ZqwttIdH840', title: 'Top Video 6', description: 'Top rated content from creators you love.' },
-      { videoId: 'xVGCFuIiIG0', title: 'Best Video 7', description: 'The best videos handpicked for your enjoyment.' },
-      { videoId: 'aEw7d3EPnMU', title: 'Awesome Content 8', description: 'Awesome and engaging content that stands out.' },
-      { videoId: 'SpMsTsnYOss', title: 'Live Stream Video 9', description: 'Live streaming experience with real-time engagement.' },
-      { videoId: 'lZmvMW1ugRM', title: 'Featured Video 10', description: 'Featured content from the best creators.' },
-      { videoId: 'oK9oTZR-ee4', title: 'Recommended Video 11', description: 'Recommended just for you based on your preferences.' },
-      { videoId: '8CCh_GLviFc', title: 'Amazing Video 12', description: 'Discover amazing content you will love watching.' },
-      { videoId: 'ZjxiNW-6aPU', title: 'Great Short Video 13', description: 'Quick and entertaining short form content.' },
-      { videoId: 'dcPOFGOC58o', title: 'Interesting Video 14', description: 'Fascinating content that keeps you engaged.' },
-      { videoId: 'to9DjfD-mm0', title: 'Popular Video 15', description: 'Popular video with thousands of views and engagement.' },
-      { videoId: 'kiiP56E_cCQ', title: 'Trending Video 16', description: 'Latest trending content everyone is watching.' },
-      { videoId: 'G9MPvy7RlS4', title: 'Featured Video 17', description: 'Specially featured content just for you.' },
-      { videoId: 'scu6_n8ozqE', title: 'Best Video 18', description: 'Best of the best videos curated for quality.' },
-      { videoId: 'r1ZM2vXiVvs', title: 'Top Video 19', description: 'Top rated and most viewed video of the month.' },
-      { videoId: '_cESW8BwGoU', title: 'Awesome Video 20', description: 'Awesome content that stands out from the rest.' },
-      { videoId: '4RW-vaVbS_0', title: 'Trending Video 21', description: 'Currently trending in the community worldwide.' },
-      { videoId: 'RzH5P-f4abg', title: 'Recommended Video 22', description: 'Recommended based on your viewing preferences.' },
-      { videoId: 'Ebe9NFgQnnU', title: 'Great Video 23', description: 'Great quality video with excellent production value.' },
-      { videoId: 'EZ2ZJxZhBoA', title: 'Popular Video 24', description: 'Popular across all platforms with great engagement.' },
-      { videoId: 'i40mxe8lUg0', title: 'Featured Video 25', description: 'Featured on homepage due to excellent quality.' },
-      { videoId: 'jjpjjcMeujM', title: 'Best Video 26', description: 'Best of our collection that you should watch.' },
-      { videoId: 'Z4hVGCWH1Kc', title: 'Trending Video 27', description: 'Trending now and gaining views every minute.' }
-    ];
+async function seedDefaultVideos() {
+  const defaultVideos = [
+    { videoId: "KzXnXhekOz4", title: "Amazing Music Video 1", description: "An incredible music video with amazing visuals and great beats." },
+    { videoId: "w9WgzE5WiyU", title: "Great Content 2", description: "High quality content that will keep you entertained." },
+    { videoId: "iYqqP1qcv5c", title: "Interesting Video 3", description: "Discover something new and interesting in this video." },
+    { videoId: "5ukPCvdY0YY", title: "Popular Video 4", description: "One of the most popular videos with millions of views." },
+    { videoId: "0TMi1bnsUZo", title: "Trending Video 5", description: "Currently trending - check out what everyone is watching." },
+    { videoId: "ZqwttIdH840", title: "Top Video 6", description: "Top rated content from creators you love." },
+    { videoId: "xVGCFuIiIG0", title: "Best Video 7", description: "The best videos handpicked for your enjoyment." },
+    { videoId: "aEw7d3EPnMU", title: "Awesome Content 8", description: "Awesome and engaging content that stands out." },
+    { videoId: "SpMsTsnYOss", title: "Live Stream Video 9", description: "Live streaming experience with real-time engagement." },
+    { videoId: "lZmvMW1ugRM", title: "Featured Video 10", description: "Featured content from the best creators." },
+    { videoId: "oK9oTZR-ee4", title: "Recommended Video 11", description: "Recommended just for you based on your preferences." },
+    { videoId: "8CCh_GLviFc", title: "Amazing Video 12", description: "Discover amazing content you will love watching." },
+    { videoId: "ZjxiNW-6aPU", title: "Great Short Video 13", description: "Quick and entertaining short form content." },
+    { videoId: "dcPOFGOC58o", title: "Interesting Video 14", description: "Fascinating content that keeps you engaged." },
+    { videoId: "to9DjfD-mm0", title: "Popular Video 15", description: "Popular video with thousands of views and engagement." },
+    { videoId: "kiiP56E_cCQ", title: "Trending Video 16", description: "Latest trending content everyone is watching." },
+    { videoId: "G9MPvy7RlS4", title: "Featured Video 17", description: "Specially featured content just for you." },
+    { videoId: "scu6_n8ozqE", title: "Best Video 18", description: "Best of the best videos curated for quality." },
+    { videoId: "r1ZM2vXiVvs", title: "Top Video 19", description: "Top rated and most viewed video of the month." },
+    { videoId: "_cESW8BwGoU", title: "Awesome Video 20", description: "Awesome content that stands out from the rest." },
+    { videoId: "4RW-vaVbS_0", title: "Trending Video 21", description: "Currently trending in the community worldwide." },
+    { videoId: "RzH5P-f4abg", title: "Recommended Video 22", description: "Recommended based on your viewing preferences." },
+    { videoId: "Ebe9NFgQnnU", title: "Great Video 23", description: "Great quality video with excellent production value." },
+    { videoId: "EZ2ZJxZhBoA", title: "Popular Video 24", description: "Popular across all platforms with great engagement." },
+    { videoId: "i40mxe8lUg0", title: "Featured Video 25", description: "Featured on homepage due to excellent quality." },
+    { videoId: "jjpjjcMeujM", title: "Best Video 26", description: "Best of our collection that you should watch." },
+    { videoId: "Z4hVGCWH1Kc", title: "Trending Video 27", description: "Trending now and gaining views every minute." }
+  ];
 
-    // Check if videos already exist
-    db.get("SELECT COUNT(*) as count FROM videos", (err, result) => {
-      if (err) {
-        console.error("Error checking videos:", err);
-        resolve();
-        return;
-      }
+  const videoCount = await Video.countDocuments();
+  if (videoCount > 0) {
+    console.log(`OK: Videos already exist (${videoCount} videos found). Skipping seeding.`);
+    return;
+  }
 
-      // Only seed if table is empty
-      if (result && result.count === 0) {
-        let insertedCount = 0;
-        
-        defaultVideos.forEach((video, index) => {
-          const thumbnail = `https://img.youtube.com/vi/${video.videoId}/maxresdefault.jpg`;
-          const embedUrl = `https://www.youtube.com/embed/${video.videoId}`;
+  console.log(`Seeding ${defaultVideos.length} default videos...`);
 
-          db.run(
-            "INSERT INTO videos (title, filename, category, thumbnail, videoUrl, likes, is_default, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            [video.title, video.videoId, 'Trending', thumbnail, embedUrl, Math.floor(Math.random() * 1000), 1, video.description],
-            (err) => {
-              if (err) {
-                console.error(`Error inserting video ${video.videoId}:`, err);
-              } else {
-                insertedCount++;
-                console.log(`✅ Default video added: ${video.title} (${insertedCount}/${defaultVideos.length})`);
-              }
-              
-              // Resolve when all videos are processed
-              if (insertedCount === defaultVideos.length) {
-                console.log(`✅ All ${defaultVideos.length} default videos seeded successfully`);
-                removeDuplicateVideos().then(resolve).catch(resolve);
-              }
-            }
-          );
-        });
-      } else {
-        console.log(`✅ Videos already exist (${result?.count || 0} videos found). Skipping seeding.`);
-        resolve();
-      }
-    });
+  const docs = defaultVideos.map((video) => {
+    const thumbnail = `https://img.youtube.com/vi/${video.videoId}/maxresdefault.jpg`;
+    const embedUrl = `https://www.youtube.com/embed/${video.videoId}`;
+    const likes = Math.floor(Math.random() * 1000);
+
+    return {
+      title: video.title,
+      filename: video.videoId,
+      category: "Trending",
+      thumbnail,
+      videoUrl: embedUrl,
+      likes,
+      is_default: true,
+      description: video.description
+    };
   });
-}
 
-// Remove duplicate videos - keep the first occurrence, delete duplicates
-function removeDuplicateVideos() {
-  return new Promise((resolve) => {
-    db.all(
-      `SELECT filename, COUNT(*) as count, GROUP_CONCAT(id) as ids 
-       FROM videos 
-       GROUP BY filename 
-       HAVING count > 1`,
-      (err, duplicates) => {
-        if (err) {
-          console.error("Error finding duplicates:", err);
-          resolve();
-          return;
-        }
-
-        if (!duplicates || duplicates.length === 0) {
-          console.log("✅ No duplicate videos found");
-          resolve();
-          return;
-        }
-
-        let deletedCount = 0;
-        const totalDuplicates = duplicates.reduce((sum, dup) => sum + (dup.ids.split(',').length - 1), 0);
-
-        duplicates.forEach(dup => {
-          const ids = dup.ids.split(',');
-          // Keep the first ID, delete the rest
-          const idsToDelete = ids.slice(1);
-          
-          idsToDelete.forEach(id => {
-            db.run(
-              "DELETE FROM videos WHERE id = ?",
-              [id],
-              (err) => {
-                if (err) {
-                  console.error(`Error deleting duplicate video ${id}:`, err);
-                } else {
-                  deletedCount++;
-                  console.log(`🗑️ Removed duplicate video ID: ${id} (${deletedCount}/${totalDuplicates})`);
-                }
-
-                // Also delete associated comments
-                db.run(
-                  "DELETE FROM comments WHERE video_id = ?",
-                  [id],
-                  (err) => {
-                    if (err) console.error(`Error deleting comments for video ${id}:`, err);
-                    
-                    if (deletedCount === totalDuplicates) {
-                      console.log(`✅ Removed ${deletedCount} duplicate videos`);
-                      resolve();
-                    }
-                  }
-                );
-              }
-            );
-          });
-        });
-
-        if (totalDuplicates === 0) {
-          resolve();
-        }
-      }
-    );
-  });
-}
-
-// Function to fetch YouTube video description from initial data
-function fetchYouTubeDescription(videoId) {
-  return new Promise((resolve) => {
-    const url = `https://www.youtube.com/watch?v=${videoId}`;
-    https.get(url, (res) => {
-      let html = '';
-      res.on('data', chunk => {
-        html += chunk;
-      });
-      res.on('end', () => {
-        try {
-          // Extract description from JSON-LD in the HTML
-          const jsonLdMatch = html.match(/"description":"([^"\\]*(\\.[^"\\]*)*?)"/);
-          if (jsonLdMatch && jsonLdMatch[1]) {
-            // Unescape the description
-            let description = jsonLdMatch[1]
-              .replace(/\\u0022/g, '"')
-              .replace(/\\u0027/g, "'")
-              .replace(/\\\//g, '/')
-              .replace(/\\\\/g, '\\')
-              .replace(/\\n/g, ' ')
-              .trim();
-            // Limit to first 150 characters
-            description = description.substring(0, 150);
-            resolve(description);
-          } else {
-            resolve('Great video content from YouTube.');
-          }
-        } catch (err) {
-          resolve('Great video content from YouTube.');
-        }
-      });
-    }).on('error', () => {
-      resolve('Great video content from YouTube.');
-    });
-  });
+  await Video.insertMany(docs, { ordered: false });
+  console.log(`OK: Seeded ${defaultVideos.length} default videos`);
 }
 
 const storage = multer.diskStorage({
@@ -286,160 +182,153 @@ app.post("/register", async (req, res) => {
       return res.status(400).json({ error: "Missing fields" });
     }
     const hash = await bcrypt.hash(password, 10);
-    db.run("INSERT INTO users (name,email,password) VALUES (?,?,?)",
-      [name, email, hash],
-      function(err) {
-        if (err) {
-          console.error("Register error:", err);
-          return res.status(400).json({ error: "Email already exists" });
-        }
-        res.json({ message: "User registered", userId: this.lastID });
-      });
+    const user = await User.create({ name, email, password: hash });
+    res.json({ message: "User registered", userId: user._id.toString() });
   } catch (error) {
+    if (error?.code === 11000) {
+      return res.status(400).json({ error: "Email already exists" });
+    }
     console.error("Register error:", error);
     res.status(500).json({ error: "Server error" });
   }
 });
 
-app.post("/login", (req, res) => {
+app.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
       return res.status(400).json({ error: "Missing email or password" });
     }
-    
-    db.get("SELECT * FROM users WHERE email=?", [email], async (err, user) => {
-      try {
-        if (err) {
-          console.error("Login database error:", err);
-          return res.status(500).json({ error: "Database error. Please try again." });
-        }
-        
-        if (!user) {
-          return res.status(401).json({ error: "Email or password is incorrect" });
-        }
-        
-        const match = await bcrypt.compare(password, user.password);
-        if (!match) {
-          return res.status(401).json({ error: "Email or password is incorrect" });
-        }
-        
-        const token = jwt.sign({ id: user.id }, SECRET, { expiresIn: '7d' });
-        res.json({ 
-          token, 
-          user: { 
-            id: user.id, 
-            name: user.name,
-            email: user.email
-          } 
-        });
-      } catch (innerErr) {
-        console.error("Login inner error:", innerErr);
-        res.status(500).json({ error: "Authentication error. Please try again." });
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(401).json({ error: "Email or password is incorrect" });
+    }
+
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) {
+      return res.status(401).json({ error: "Email or password is incorrect" });
+    }
+
+    const token = jwt.sign({ id: user._id.toString() }, SECRET, { expiresIn: "7d" });
+    res.json({
+      token,
+      user: {
+        id: user._id.toString(),
+        name: user.name,
+        email: user.email
       }
     });
   } catch (error) {
-    console.error("Login outer error:", error);
-    res.status(500).json({ error: "Server error. Please try again." });
+    console.error("Login error:", error);
+    res.status(500).json({ error: "Server error" });
   }
 });
 
-app.post("/upload", uploadFields, (req, res) => {
-  const { title, category } = req.body;
-  const videoFile = req.files.video[0].filename;
-  const thumbFile = req.files.thumbnail[0].filename;
-  db.run("INSERT INTO videos (title,filename,category,thumbnail,videoUrl) VALUES (?,?,?,?,?)",
-    [title, videoFile, category, thumbFile, null],
-    () => res.json({ message: "Video uploaded" })
-  );
-});
+app.post("/upload", uploadFields, async (req, res) => {
+  try {
+    const { title, category } = req.body;
+    if (!req.files?.video?.[0] || !req.files?.thumbnail?.[0]) {
+      return res.status(400).json({ error: "Missing video or thumbnail file" });
+    }
+    const videoFile = req.files.video[0].filename;
+    const thumbFile = req.files.thumbnail[0].filename;
 
-app.get("/videos", (req, res) => {
-  const q = req.query.q;
-  let sql = "SELECT * FROM videos";
-  let params = [];
-  if (q) {
-    sql += " WHERE title LIKE ?";
-    params.push("%" + q + "%");
+    await Video.create({
+      title,
+      filename: videoFile,
+      category,
+      thumbnail: thumbFile,
+      videoUrl: null
+    });
+
+    res.json({ message: "Video uploaded" });
+  } catch (error) {
+    console.error("Upload error:", error);
+    res.status(500).json({ error: "Error uploading video" });
   }
-  sql += " ORDER BY id DESC";
-  db.all(sql, params, (err, rows) => res.json(rows));
 });
 
-app.post("/like/:id", (req, res) => {
-  db.run("UPDATE videos SET likes=likes+1 WHERE id=?",
-    [req.params.id],
-    () => res.json({ message: "Liked" })
-  );
+app.get("/videos", async (req, res) => {
+  try {
+    const q = req.query.q;
+    const filter = q ? { title: { $regex: q, $options: "i" } } : {};
+    const videos = await Video.find(filter).sort({ createdAt: -1 });
+    res.json(videos.map((video) => video.toJSON()));
+  } catch (error) {
+    console.error("Videos error:", error);
+    res.status(500).json({ error: "Error fetching videos" });
+  }
 });
 
-app.post("/comment", (req, res) => {
-  const { user_id, video_id, comment } = req.body;
-  db.run("INSERT INTO comments (user_id,video_id,comment) VALUES (?,?,?)",
-    [user_id, video_id, comment],
-    () => res.json({ message: "Comment added" })
-  );
+app.post("/like/:id", async (req, res) => {
+  try {
+    if (!isValidObjectId(req.params.id)) {
+      return res.status(400).json({ error: "Invalid video id" });
+    }
+    const result = await Video.updateOne({ _id: req.params.id }, { $inc: { likes: 1 } });
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: "Video not found" });
+    }
+    res.json({ message: "Liked" });
+  } catch (error) {
+    console.error("Like error:", error);
+    res.status(500).json({ error: "Error updating likes" });
+  }
 });
 
-app.get("/comments/:videoId", (req, res) => {
-  db.all("SELECT * FROM comments WHERE video_id=?",
-    [req.params.videoId],
-    (err, rows) => res.json(rows)
-  );
+app.post("/comment", async (req, res) => {
+  try {
+    const { user_id, video_id, comment } = req.body;
+    if (!video_id || !comment) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+    await Comment.create({ user_id, video_id, comment });
+    res.json({ message: "Comment added" });
+  } catch (error) {
+    console.error("Comment error:", error);
+    res.status(500).json({ error: "Error adding comment" });
+  }
 });
 
-app.delete("/videos/:id", (req, res) => {
+app.get("/comments/:videoId", async (req, res) => {
+  try {
+    const comments = await Comment.find({ video_id: req.params.videoId }).sort({ createdAt: -1 });
+    res.json(comments.map((comment) => comment.toJSON()));
+  } catch (error) {
+    console.error("Comments error:", error);
+    res.status(500).json({ error: "Error fetching comments" });
+  }
+});
+
+app.delete("/videos/:id", async (req, res) => {
   try {
     const videoId = req.params.id;
-    
-    // First, get the video to check if it's a default video
-    db.get("SELECT filename, thumbnail, is_default FROM videos WHERE id=?", [videoId], (err, video) => {
-      if (err) {
-        console.error("Error fetching video:", err);
-        return res.status(500).json({ error: "Server error" });
-      }
-      
-      if (!video) {
-        return res.status(404).json({ error: "Video not found" });
-      }
+    if (!isValidObjectId(videoId)) {
+      return res.status(400).json({ error: "Invalid video id" });
+    }
+    const video = await Video.findById(videoId);
 
-      // Prevent deletion of default videos
-      if (video.is_default === 1) {
-        return res.status(403).json({ error: "Cannot delete default videos" });
-      }
+    if (!video) {
+      return res.status(404).json({ error: "Video not found" });
+    }
 
-      // Delete from database
-      db.run("DELETE FROM videos WHERE id=?", [videoId], (deleteErr) => {
-        if (deleteErr) {
-          console.error("Error deleting video:", deleteErr);
-          return res.status(500).json({ error: "Error deleting video" });
-        }
+    if (video.is_default) {
+      return res.status(403).json({ error: "Cannot delete default videos" });
+    }
 
-        // Delete associated comments
-        db.run("DELETE FROM comments WHERE video_id=?", [videoId], (commentErr) => {
-          if (commentErr) {
-            console.error("Error deleting comments:", commentErr);
-          }
-        });
+    await Video.deleteOne({ _id: videoId });
+    await Comment.deleteMany({ video_id: videoId });
 
-        // Try to delete files (optional - won't fail if files don't exist)
-        const fs = require('fs').promises;
-        const path = require('path');
-        
-        const videoPath = path.join('uploads', video.filename);
-        const thumbPath = path.join('uploads', video.thumbnail);
-        
-        Promise.all([
-          fs.unlink(videoPath).catch(() => {}),
-          fs.unlink(thumbPath).catch(() => {})
-        ]).then(() => {
-          res.json({ message: "Video deleted successfully" });
-        }).catch(err => {
-          console.error("Error deleting files:", err);
-          res.json({ message: "Video deleted from database" });
-        });
-      });
-    });
+    const videoPath = path.join(__dirname, "uploads", video.filename);
+    const thumbPath = path.join(__dirname, "uploads", video.thumbnail);
+
+    await Promise.all([
+      fs.unlink(videoPath).catch(() => {}),
+      fs.unlink(thumbPath).catch(() => {})
+    ]);
+
+    res.json({ message: "Video deleted successfully" });
   } catch (error) {
     console.error("Delete error:", error);
     res.status(500).json({ error: "Server error" });
@@ -447,22 +336,22 @@ app.delete("/videos/:id", (req, res) => {
 });
 
 // Import video from YouTube URL
-app.post("/import-youtube", (req, res) => {
+app.post("/import-youtube", async (req, res) => {
   try {
     const { url, title, category } = req.body;
-    
+
     if (!url || !title || !category) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
     // Extract YouTube video ID
     let videoId = null;
-    if (url.includes('youtube.com/watch?v=')) {
-      videoId = url.split('v=')[1]?.split('&')[0];
-    } else if (url.includes('youtu.be/')) {
-      videoId = url.split('youtu.be/')[1]?.split('?')[0];
-    } else if (url.includes('youtube.com/embed/')) {
-      videoId = url.split('embed/')[1]?.split('?')[0];
+    if (url.includes("youtube.com/watch?v=")) {
+      videoId = url.split("v=")[1]?.split("&")[0];
+    } else if (url.includes("youtu.be/")) {
+      videoId = url.split("youtu.be/")[1]?.split("?")[0];
+    } else if (url.includes("youtube.com/embed/")) {
+      videoId = url.split("embed/")[1]?.split("?")[0];
     }
 
     if (!videoId) {
@@ -470,80 +359,55 @@ app.post("/import-youtube", (req, res) => {
     }
 
     // Check if video already exists
-    db.get("SELECT id FROM videos WHERE filename = ?", [videoId], (err, existingVideo) => {
-      if (err) {
-        console.error("Error checking for duplicate:", err);
-        return res.status(500).json({ error: "Server error" });
-      }
+    const existingVideo = await Video.findOne({ filename: videoId });
+    if (existingVideo) {
+      return res.status(400).json({ error: "This video is already in your collection" });
+    }
 
-      if (existingVideo) {
-        return res.status(400).json({ error: "This video is already in your collection" });
-      }
+    const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+    const embedUrl = `https://www.youtube.com/embed/${videoId}`;
 
-      // Get video metadata from YouTube
-      const apiUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`;
-      
-      https.get(apiUrl, (apiRes) => {
-        let data = '';
-        
-        apiRes.on('data', chunk => {
+    const saveVideo = async (videoTitle, description) => {
+      const newVideo = await Video.create({
+        title: videoTitle,
+        filename: videoId,
+        category,
+        thumbnail: thumbnailUrl,
+        videoUrl: embedUrl,
+        likes: 0,
+        description
+      });
+
+      res.json({
+        message: "Video imported successfully",
+        videoId: newVideo._id.toString(),
+        videoUrl: embedUrl,
+        thumbnail: thumbnailUrl
+      });
+    };
+
+    // Get video metadata from YouTube
+    const apiUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`;
+
+    https.get(apiUrl, (apiRes) => {
+      let data = "";
+
+      apiRes.on("data", (chunk) => {
         data += chunk;
       });
-      
-      apiRes.on('end', () => {
+
+      apiRes.on("end", async () => {
         try {
           const videoData = JSON.parse(data);
-          const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
-          
-          // Fetch the actual YouTube description
-          fetchYouTubeDescription(videoId).then(description => {
-            // Store in database with YouTube URL
-            db.run(
-              "INSERT INTO videos (title, filename, category, thumbnail, videoUrl, likes, description) VALUES (?, ?, ?, ?, ?, ?, ?)",
-              [videoData.title || title, videoId, category, thumbnailUrl, `https://www.youtube.com/embed/${videoId}`, 0, description],
-              function(err) {
-                if (err) {
-                  console.error("Error inserting video:", err);
-                  return res.status(500).json({ error: "Error saving video" });
-                }
-                res.json({ 
-                  message: "Video imported successfully",
-                  videoId: this.lastID,
-                  videoUrl: `https://www.youtube.com/embed/${videoId}`,
-                  thumbnail: thumbnailUrl
-                });
-              }
-            );
-          });
+          await saveVideo(videoData.title || title, "Great video content from YouTube.");
         } catch (parseErr) {
           console.error("Error parsing YouTube data:", parseErr);
-          // Fallback: store without metadata
-          db.run(
-            "INSERT INTO videos (title, filename, category, thumbnail, videoUrl, likes, description) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            [title, videoId, category, `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`, `https://www.youtube.com/embed/${videoId}`, 0, 'Great video content from YouTube.'],
-            function(err) {
-              if (err) {
-                return res.status(500).json({ error: "Error saving video" });
-              }
-              res.json({ message: "Video imported successfully" });
-            }
-          );
+          await saveVideo(title, "Great video content from YouTube.");
         }
       });
-    }).on('error', (err) => {
+    }).on("error", async (err) => {
       console.error("Error fetching YouTube metadata:", err);
-      // Store without metadata
-      db.run(
-        "INSERT INTO videos (title, filename, category, thumbnail, videoUrl, likes, description) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        [title, videoId, category, `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`, `https://www.youtube.com/embed/${videoId}`, 0, 'Great video content from YouTube.'],
-        function(err) {
-          if (err) {
-            return res.status(500).json({ error: "Error saving video" });
-          }
-          res.json({ message: "Video imported successfully" });
-        }
-      );
-    });
+      await saveVideo(title, "Great video content from YouTube.");
     });
   } catch (error) {
     console.error("Import error:", error);
@@ -551,27 +415,34 @@ app.post("/import-youtube", (req, res) => {
   }
 });
 
-// Clear all videos (for cleanup)
-app.delete("/videos", (req, res) => {
+// Clear all videos
+app.delete("/videos", async (req, res) => {
   try {
-    db.run("DELETE FROM videos", (err) => {
-      if (err) {
-        return res.status(500).json({ error: "Error clearing videos" });
-      }
-      db.run("DELETE FROM comments", (commentErr) => {
-        if (commentErr) console.error("Error clearing comments:", commentErr);
-        res.json({ message: "All videos deleted" });
-      });
-    });
+    await Video.deleteMany({});
+    await Comment.deleteMany({});
+    res.json({ message: "All videos deleted" });
   } catch (error) {
     console.error("Clear error:", error);
     res.status(500).json({ error: "Server error" });
   }
 });
 
-// Start server only after database is ready
-app.listen(PORT, () => {
-  console.log(`✅ Server running on port ${PORT}`);
-  console.log(`🔗 API URL: http://localhost:${PORT}`);
-  console.log(`📺 Videos endpoint: http://localhost:${PORT}/videos`);
+// Health check endpoint
+app.get("/health", (req, res) => {
+  res.json({ status: "OK", ready: dbReady });
 });
+
+// Initialize database and start server
+initializeDatabase()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`OK: Server running on port ${PORT}`);
+      console.log(`API URL: http://localhost:${PORT}`);
+      console.log(`Videos endpoint: http://localhost:${PORT}/videos`);
+      console.log(`Health check: http://localhost:${PORT}/health`);
+    });
+  })
+  .catch((err) => {
+    console.error("ERROR: Failed to initialize database:", err);
+    process.exit(1);
+  });

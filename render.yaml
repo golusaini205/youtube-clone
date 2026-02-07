@@ -3,7 +3,7 @@ services:
     name: youtube-clone-backend
     runtime: node
     buildCommand: cd backend && npm install
-    startCommand: cd backend && npm run start-postgres
+    startCommand: cd backend && npm start
     env:
       - key: NODE_ENV
         value: production
@@ -11,7 +11,8 @@ services:
         value: 5000
       - key: JWT_SECRET
         value: your-secret-key-change-this
-    envGroupId: youtube-clone-db
+      - key: MONGODB_URI
+        value: mongodb+srv://<user>:<password>@<cluster>/<db>?retryWrites=true&w=majority
     routes:
       - path: /api
         destination: http://localhost:5000
@@ -23,8 +24,4 @@ services:
     routes:
       - path: /
         destination: index.html
-
-  - type: pgsql
-    name: youtube-clone-db
-    ipAllowList: []
 

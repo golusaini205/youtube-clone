@@ -23,20 +23,28 @@ A modern YouTube clone built with React and Express, featuring video streaming, 
    npm run install-all
    ```
 
-2. **Start backend server**
+2. **Create a local `.env`**
+   ```env
+PORT=5000
+NODE_ENV=production
+MONGODB_URI=mongodb+srv://user:password@cluster/dbname?retryWrites=true&w=majority
+JWT_SECRET=your-secret-key-here
+```
+
+3. **Start backend server**
    ```bash
    npm start
    ```
    Backend runs on `http://localhost:5000`
 
-3. **Start frontend (in another terminal)**
+4. **Start frontend (in another terminal)**
    ```bash
    cd frontend
    npm run dev
    ```
    Frontend runs on `http://localhost:3000`
 
-4. **Open browser**
+5. **Open browser**
    Navigate to `http://localhost:3000`
 
 ### Development Mode
@@ -71,7 +79,12 @@ This creates an optimized build in `frontend/dist`
    - Connect your GitHub repository
    - Select branch to deploy
 
-3. **Configure Backend Service**
+3. **Create MongoDB Database**
+   - Create a cluster in MongoDB Atlas (or another managed MongoDB)
+   - Create a database user and allowlist the Render IPs or allow all
+   - Copy the connection string (MONGODB_URI)
+
+4. **Configure Backend Service**
    - **Name**: `youtube-clone-backend`
    - **Environment**: Node
    - **Build Command**: `cd backend && npm install`
@@ -80,16 +93,17 @@ This creates an optimized build in `frontend/dist`
      ```
      PORT=5000
      NODE_ENV=production
+     MONGODB_URI=mongodb+srv://user:password@cluster/dbname?retryWrites=true&w=majority
      ```
 
-4. **Configure Frontend Service**
+5. **Configure Frontend Service**
    - **Name**: `youtube-clone-frontend`
    - **Environment**: Node
    - **Build Command**: `cd frontend && npm install && npm run build`
    - **Static Site**: Enable
    - **Publish directory**: `frontend/dist`
 
-5. **Link Services**
+6. **Link Services**
    - Update frontend `vite.config.js` to use your backend URL
    - Set API proxy to your Render backend URL
 
@@ -97,23 +111,24 @@ This creates an optimized build in `frontend/dist`
 
 ```
 youtube-clone/
-├── backend/
-│   ├── server.js           # Express server
-│   ├── package.json        # Backend dependencies
-│   ├── youtube_clone.db    # SQLite database
-│   └── uploads/            # Uploaded video files
-├── frontend/
-│   ├── src/
-│   │   ├── App.jsx         # Main React component
-│   │   ├── main.jsx        # Entry point
-│   │   ├── style.css       # Styles
-│   │   └── components/     # React components
-│   ├── package.json        # Frontend dependencies
-│   └── vite.config.js      # Vite configuration
-├── package.json            # Root scripts
-├── .gitignore              # Git ignore rules
-├── render.yaml             # Render deployment config
-└── README.md               # This file
+|-- backend/
+|   |-- server-mongo.js      # Express server (MongoDB)
+|   |-- server.js            # Express server (SQLite - optional)
+|   |-- package.json         # Backend dependencies
+|   |-- youtube_clone.db     # SQLite database (optional)
+|   `-- uploads/             # Uploaded video files
+|-- frontend/
+|   |-- src/
+|   |   |-- App.jsx          # Main React component
+|   |   |-- main.jsx         # Entry point
+|   |   |-- style.css        # Styles
+|   |   `-- components/      # React components
+|   |-- package.json         # Frontend dependencies
+|   `-- vite.config.js       # Vite configuration
+|-- package.json             # Root scripts
+|-- .gitignore               # Git ignore rules
+|-- render.yaml              # Render deployment config
+`-- README.md                # This file
 ```
 
 ## Configuration
@@ -125,7 +140,7 @@ Create a `.env` file in the root directory:
 ```env
 PORT=5000
 NODE_ENV=production
-DB_PATH=./youtube_clone.db
+MONGODB_URI=mongodb+srv://user:password@cluster/dbname?retryWrites=true&w=majority
 JWT_SECRET=your-secret-key-here
 ```
 
@@ -152,7 +167,7 @@ See `.env.example` for all available options.
 
 **Backend**
 - Express.js
-- SQLite3
+- MongoDB (via Mongoose)
 - Node.js
 - bcryptjs (password hashing)
 - jsonwebtoken (JWT auth)
@@ -162,3 +177,8 @@ See `.env.example` for all available options.
 ## 🤝 Support
 
 For issues and questions, please open an issue on GitHub.
+
+
+
+
+

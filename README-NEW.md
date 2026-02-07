@@ -12,32 +12,40 @@ A modern YouTube clone built with React and Express, featuring video streaming, 
 - **Real-time Metadata**: Fetch actual YouTube descriptions and thumbnails
 - **Duplicate Detection**: Automatically prevent duplicate video imports
 - **Sidebar Navigation**: YouTube-style navigation menu
-- **PostgreSQL Database**: Persistent data storage with Render deployment
+- **MongoDB Database**: Persistent data storage with Render deployment
 - **Default Videos**: 27 pre-loaded videos on first deployment
 
 ##  Quick Start
 
-### Local Development (with SQLite)
+### Local Development (MongoDB)
 
 1. **Install dependencies**
    ```bash
    npm run install-all
    ```
 
-2. **Start backend server**
+2. **Create a local `.env`**
+   ```env
+   PORT=5000
+   NODE_ENV=development
+   MONGODB_URI=mongodb+srv://<user>:<password>@<cluster>/<db>?retryWrites=true&w=majority
+   JWT_SECRET=your-secret-key-change-this
+   ```
+
+3. **Start backend server**
    ```bash
    npm start
    ```
    Backend runs on `http://localhost:5000`
 
-3. **Start frontend (in another terminal)**
+4. **Start frontend (in another terminal)**
    ```bash
    cd frontend
    npm run dev
    ```
    Frontend runs on `http://localhost:3000`
 
-4. **Open browser**
+5. **Open browser**
    Navigate to `http://localhost:3000`
 
 ### Development Mode
@@ -56,20 +64,20 @@ This creates an optimized build in `frontend/dist`
 
 ## 🌐 Deploy to Render
 
-### Why PostgreSQL Instead of SQLite?
+### Why MongoDB Instead of SQLite?
 
-SQLite doesn't persist data on Render's ephemeral filesystem. PostgreSQL provides:
+SQLite doesn't persist data on Render's ephemeral filesystem. MongoDB provides:
 - ✅ Persistent data storage
-- ✅ Automatic backups
+- ✅ Cloud-hosted reliability (Atlas or other managed MongoDB)
 - ✅ Reliable default video loading
-- ✅ Better performance at scale
+- ✅ Easy scaling
 
 ### Deployment Steps
 
 1. **Push code to GitHub**
    ```bash
    git add .
-   git commit -m "Deploy with PostgreSQL"
+   git commit -m "Deploy with MongoDB"
    git push origin main
    ```
 
@@ -82,27 +90,24 @@ SQLite doesn't persist data on Render's ephemeral filesystem. PostgreSQL provide
 3. **Configure Services**
    
    **Option A: Using render.yaml (Recommended)**
-   - Render will automatically create the PostgreSQL database
-   - All services will be configured from `render.yaml`
-   - Just deploy and it works!
+   - Render will configure services from `render.yaml`
+   - Set `MONGODB_URI` in the service environment (Atlas or another managed MongoDB)
+   - Deploy and it works!
    
    **Option B: Manual Configuration**
    
-   - **Create PostgreSQL Database First**
-     - Click "New +" → "PostgreSQL"
-     - Give it a name (e.g., `youtube-clone-db`)
-     - Note the database URL
+   - **Create MongoDB Database First**`r`n     - Create a cluster in MongoDB Atlas (or another managed MongoDB)`r`n     - Create a database user and allowlist the Render IPs or allow all`r`n     - Copy the connection string (MONGODB_URI)
    
    - **Configure Backend Service**
      - **Name**: `youtube-clone-backend`
      - **Environment**: Node
      - **Build Command**: `cd backend && npm install`
-     - **Start Command**: `cd backend && npm run start-postgres`
+     - **Start Command**: `cd backend && npm start`
      - **Environment Variables**:
        ```
        NODE_ENV=production
        PORT=5000
-       DATABASE_URL=postgresql://user:password@host:5432/dbname
+       MONGODB_URI=mongodb+srv://user:password@cluster/dbname?retryWrites=true&w=majority
        JWT_SECRET=your-secret-key-change-this
        ```
    
@@ -135,7 +140,7 @@ SQLite doesn't persist data on Render's ephemeral filesystem. PostgreSQL provide
 youtube-clone/
 ├── backend/
 │   ├── server.js               # Express server (SQLite - local dev)
-│   ├── server-postgres.js      # Express server (PostgreSQL - production)
+│   ├── server-mongo.js         # Express server (MongoDB - default)
 │   ├── package.json            # Backend dependencies
 │   ├── youtube_clone.db        # SQLite database (local only)
 │   └── uploads/                # Uploaded video files
@@ -157,8 +162,7 @@ youtube-clone/
 
 ### Environment Variables
 
-**For Local Development (.env)**
-```env
+**For Local Development (.env)**`r`n```env`r`nPORT=5000`r`nNODE_ENV=development`r`nMONGODB_URI=mongodb+srv://user:password@cluster/dbname?retryWrites=true&w=majority`r`nJWT_SECRET=your-super-secret-key-here`r`n```env
 PORT=5000
 NODE_ENV=development
 ```
@@ -167,7 +171,7 @@ NODE_ENV=development
 ```env
 NODE_ENV=production
 PORT=5000
-DATABASE_URL=postgresql://user:password@host:5432/dbname
+MONGODB_URI=mongodb+srv://user:password@cluster/dbname?retryWrites=true&w=majority
 JWT_SECRET=your-super-secret-key-here
 ```
 
@@ -202,29 +206,28 @@ JWT_SECRET=your-super-secret-key-here
 
 **Backend**
 - Express.js
-- PostgreSQL (production) / SQLite3 (development)
+- MongoDB (default) / SQLite3 (optional)
 - Node.js
 - bcryptjs (password hashing)
 - jsonwebtoken (JWT auth)
 - Multer (file uploads)
-- pg (PostgreSQL driver)
-
+- mongoose (MongoDB ODM)`r`n
 ## 🚀 Troubleshooting
 
 ### Default Videos Not Showing on Render
-1. Check that `DATABASE_URL` environment variable is set correctly
-2. Verify PostgreSQL database was created
+1. Check that `MONGODB_URI` environment variable is set correctly
+2. Verify MongoDB cluster and user are created
 3. Check Render logs for seeding messages
 4. Delete the service and redeploy if database is corrupted
 
 ### Database Connection Issues
-- Verify `DATABASE_URL` format: `postgresql://user:password@host:5432/dbname`
-- Check that PostgreSQL service is running
+- Verify `MONGODB_URI` format: `mongodb+srv://user:password@cluster/dbname?retryWrites=true&w=majority`
+- Check that the MongoDB cluster is running and accessible
 - Ensure SSL mode is correct for your environment
 
 ### Videos Disappearing After Restart
 - This was the original issue with SQLite
-- PostgreSQL persists data automatically
+- MongoDB persists data automatically
 - No action needed - data survives restarts
 
 ## 📄 License
@@ -238,3 +241,12 @@ Feel free to fork and submit pull requests!
 ## 🤝 Support
 
 For issues and questions, please open an issue on GitHub.
+
+
+
+
+
+
+
+
+

@@ -9,32 +9,32 @@ When deployed to Render, your default videos don't appear, but they work fine on
 - SQLite database gets lost on every deployment
 - Default videos are only created on first startup, so they disappear
 
-## ✅ The Solution: Use PostgreSQL
+## ✅ The Solution: Use MongoDB
 
-I've created a complete PostgreSQL migration for you.
+I've created a complete MongoDB migration for you.
 
 ## 📋 Files Created/Modified
 
 ### New Files:
-1. **`backend/server-postgres.js`** - PostgreSQL version of your server
-   - Uses `pg` driver (PostgreSQL)
+1. **`backend/server-mongo.js`** - MongoDB version of your server
+   - Uses `mongoose` (MongoDB ODM)
    - Async/await pattern with Promises
    - Better error handling
    - Automatic default video seeding
 
 ### Updated Files:
-1. **`backend/package.json`** - Added PostgreSQL driver
+1. **`backend/package.json`** - Added MongoDB driver (mongoose)
    ```json
-   "pg": "^8.11.3"
+   "mongoose": "^8.9.2"
    ```
-   - Added new scripts: `start-postgres` and `dev-postgres`
+   - Added new scripts: `start` and `dev`
 
-2. **`render.yaml`** - Updated for PostgreSQL
-   - Changed start command to `npm run start-postgres`
-   - Added PostgreSQL service definition
+2. **`render.yaml`** - Updated for MongoDB
+   - Changed start command to `npm start`
+   - Removed PostgreSQL service definition
    - Proper environment variable linking
 
-3. **`README-NEW.md`** - Complete deployment guide with PostgreSQL setup
+3. **`README-NEW.md`** - Complete deployment guide with MongoDB setup
 
 ## 🚀 How to Deploy (Step-by-Step)
 
@@ -42,7 +42,7 @@ I've created a complete PostgreSQL migration for you.
 ```bash
 cd "C:\Users\ADMIN\OneDrive\Documents\golu document\NXTWAVE PROJECTS\youtube-clone"
 git add .
-git commit -m "Migrate to PostgreSQL for persistent data on Render"
+git commit -m "Migrate to MongoDB for persistent data on Render"
 git push origin main
 ```
 
@@ -53,9 +53,9 @@ git push origin main
 4. Connect GitHub and select your repo
 5. Render will auto-detect `render.yaml`
 6. It will automatically:
-   - Create the PostgreSQL database
+   - Create the MongoDB cluster
    - Set up environment variables
-   - Deploy backend with PostgreSQL
+   - Deploy backend with MongoDB
    - Deploy frontend
    - Seed 27 default videos
 
@@ -84,7 +84,7 @@ db.serialize(() => {
 app.listen(PORT, ...)
 ```
 
-### After (PostgreSQL - Works on Render):
+### After (MongoDB - Works on Render):
 ```javascript
 async function initializeDatabase() {
   // Create tables
@@ -108,19 +108,19 @@ initializeDatabase()
 | Database | Local Dev | Render |
 |----------|-----------|--------|
 | SQLite | ✅ Works | ❌ Data lost on restart |
-| PostgreSQL | ✅ Works | ✅ **Persists forever** |
+| MongoDB | ✅ Works | ✅ **Persists forever** |
 
 ## 🧪 Testing Locally (Optional)
 
-To test the PostgreSQL version locally, you'd need PostgreSQL installed. For now:
-- Continue using `npm start` (SQLite) for local development
-- Production uses PostgreSQL automatically via Render
+To test MongoDB locally, use Atlas or a local MongoDB instance. For now:
+- Use `npm start` with MONGODB_URI for local development
+- Production uses MongoDB via MONGODB_URI
 
 ## 🆘 If Something Goes Wrong
 
 1. **Videos still not showing?**
    - Check Render logs for errors
-   - Verify DATABASE_URL is set in environment variables
+   - Verify MONGODB_URI is set in environment variables
    - Try deleting and redeploying
 
 2. **Can't see seed progress?**
@@ -128,13 +128,13 @@ To test the PostgreSQL version locally, you'd need PostgreSQL installed. For now
    - Look for "Starting to seed" messages
 
 3. **Database connection error?**
-   - Confirm PostgreSQL service is running (check Render dashboard)
-   - Verify DATABASE_URL format
+   - Confirm MongoDB cluster is running and accessible
+   - Verify MONGODB_URI format
 
 ## 📝 Environment Variables Set Automatically by Render
 
 When you use `render.yaml`:
-- `DATABASE_URL` - PostgreSQL connection string
+- `MONGODB_URI` - MongoDB connection string
 - `NODE_ENV` - production
 - `PORT` - 5000
 - `JWT_SECRET` - your secret key
@@ -154,3 +154,5 @@ When you use `render.yaml`:
 2. Deploy on Render (it will use render.yaml automatically)
 3. Watch the logs as videos seed
 4. Enjoy your working YouTube clone! 🎉
+
+
