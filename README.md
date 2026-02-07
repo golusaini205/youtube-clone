@@ -144,7 +144,7 @@ MONGODB_URI=mongodb+srv://user:password@cluster/dbname?retryWrites=true&w=majori
 JWT_SECRET=your-secret-key-here
 ```
 
-See `.env.example` for all available options.
+See `.env` for all available options.
 
 ##  API Endpoints
 
@@ -171,12 +171,9 @@ See `.env.example` for all available options.
 - Node.js
 - bcryptjs (password hashing)
 - jsonwebtoken (JWT auth)
-- Multer (file uploads)
 
 
-## 🤝 Support
 
-For issues and questions, please open an issue on GitHub.
 
 
 
